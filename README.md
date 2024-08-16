@@ -19,7 +19,19 @@ conda activate drones
 
 pip3 install --upgrade pip
 pip3 install -e . # if needed, `sudo apt install build-essential` to install `gcc` and build `pybullet`
+```
+### Docker Container merged with conda-ROS2 (add by myamazum)
 
+Tested on Intel x64/Ubuntu 22.04/WSL2 with NVIDIA GeForce RTX 3050
+```sh
+git clone https://github.com/myamazum/gym-pybullet-drones.git ros-pybullet-drones
+cd ros-pybullet-drones/
+docker build . -t ros/pybullet:humble
+```
+After docker running, activates conda from "base" to "ros_env".
+Don't source /opt/ros/humble/setup.bash etc...
+```sh
+conda activate ros_env
 ```
 
 ## Use
