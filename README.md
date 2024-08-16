@@ -32,6 +32,9 @@ After docker running, activates conda from "base" to "ros_env".
 Don't source /opt/ros/humble/setup.bash etc...
 ```sh
 conda activate ros_env
+cd ~/ros2_ws
+colcon build
+source install/setup.bash
 ```
 
 ## Use
@@ -42,6 +45,21 @@ conda activate ros_env
 cd gym_pybullet_drones/examples/
 python3 pid.py # position and velocity reference
 python3 pid_velocity.py # desired velocity reference
+```
+
+### PID control examples (ROS2)
+on docker, activate conda(ros_env)
+
+Original pid.py (one node)
+```sh
+cd ~/ros2/ && source install/setup.bash
+ros2 run pybullet_ros test_pid
+```
+
+ROS2 like pid.py (multi node)
+```sh
+cd ~/ros2/ && source install/setup.bash
+ros2 run pybullet_ros drone
 ```
 
 ### Downwash effect example
