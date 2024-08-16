@@ -1,0 +1,4 @@
+resource/*
+results/
+test/
+__pycache__/

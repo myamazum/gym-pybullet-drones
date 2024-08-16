@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  ros:
+    image: pybullet:humble
+    container_name: pydrone_test
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./ros2:/root/ros2_ws/src:rw
+    network_mode: "host"
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
