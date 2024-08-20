@@ -32,6 +32,8 @@ After docker running, activates conda from "base" to "ros_env".
 Don't source /opt/ros/humble/setup.bash etc...
 ```sh
 conda activate ros_env
+conda install -c robostack-staging ros-humble-xacro
+conda install -c robostack-staging ros-humble-tf-transformations
 cd ~/ros2_ws
 colcon build
 source install/setup.bash

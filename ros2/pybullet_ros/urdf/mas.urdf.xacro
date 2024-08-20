@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="pybullet_ros">
+  <link name="map" />
+  <link name="world"/>
+
+  <joint name="map_wolrd" type="fixed">
+    <origin rpy="0 0 0" xyz="1 0 0"/>
+    <parent link="map"/>
+    <child  link="world"/>    
+  </joint>
+
+  <xacro:include filename="$(find pybullet_ros)/urdf/drone.urdf.xacro" />
+  <xacro:drone_macro suffix='a' parent='world' x_dist="0.3" y_dist="0.0" z_dist="1.0" radius="0" />
+  <xacro:drone_macro suffix='b' parent='world' x_dist="0.3" y_dist="0.6" z_dist="1.0" radius="0" />
+  <xacro:drone_macro suffix='c' parent='world' x_dist="-0.3" y_dist="0.0" z_dist="1.0" radius="0" />
+  <xacro:drone_macro suffix='d' parent='world' x_dist="-0.3" y_dist="0.6" z_dist="1.0" radius="0" />
+
+</robot>
