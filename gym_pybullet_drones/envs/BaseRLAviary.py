@@ -57,7 +57,7 @@ class BaseRLAviary(BaseAviary):
         record : bool, optional
             Whether to save a video of the simulation.
         obs : ObservationType, optional
-            The type of observation space (kinematic information or vision)
+            The type of observation space (kinematic information, rgb, depth, or all)
         act : ActionType, optional
             The type of action space (1 or 3D; RPMS, thurst and torques, waypoint or velocity with PID control; etc.)
 
@@ -66,7 +66,7 @@ class BaseRLAviary(BaseAviary):
         self.ACTION_BUFFER_SIZE = int(ctrl_freq//2)
         self.action_buffer = deque(maxlen=self.ACTION_BUFFER_SIZE)
         ####
-        vision_attributes = True if obs == ObservationType.RGB else False
+        vision_attributes = True if obs in (ObservationType.RGB, ObservationType.DEP, ObservationType.ALL) else False
         self.OBS_TYPE = obs
         self.ACT_TYPE = act
         #### Create integrated controllers #########################
@@ -249,11 +249,21 @@ class BaseRLAviary(BaseAviary):
             A Box() of shape (NUM_DRONES,H,W,4) or (NUM_DRONES,12) depending on the observation type.
 
         """
-        if self.OBS_TYPE == ObservationType.RGB:
-            return spaces.Box(low=0,
-                              high=255,
-                              shape=(self.NUM_DRONES, self.IMG_RES[1], self.IMG_RES[0], 4), dtype=np.uint8)
-        elif self.OBS_TYPE == ObservationType.KIN:
+        if self.OBS_TYPE in (ObservationType.RGB, ObservationType.ALL):
+            rgb = spaces.Box(low=0,
+                             high=255,
+                             shape=(self.NUM_DRONES, self.IMG_RES[1], self.IMG_RES[0], 4), dtype=np.uint8)
+
+            if self.OBS_TYPE == ObservationType.RGB: return rgb
+
+        if self.OBS_TYPE in (ObservationType.DEP, ObservationType.ALL):
+            dep = spaces.Box(low=0.0,
+                             high=1.0,
+                             shape=(self.NUM_DRONES, self.IMG_RES[1], self.IMG_RES[0]), dtype=np.float32)
+
+            if self.OBS_TYPE == ObservationType.DEP: return dep
+
+        if self.OBS_TYPE in (ObservationType.KIN, ObservationType.ALL):
             ############################################################
             #### OBS SPACE OF SIZE 12
             #### Observation vector ### X        Y        Z       Q1   Q2   Q3   Q4   R       P       Y       VX       VY       VZ       WX       WY       WZ
@@ -274,8 +284,14 @@ class BaseRLAviary(BaseAviary):
                 elif self.ACT_TYPE in [ActionType.ONE_D_RPM, ActionType.ONE_D_PID]:
                     obs_lower_bound = np.hstack([obs_lower_bound, np.array([[act_lo] for i in range(self.NUM_DRONES)])])
                     obs_upper_bound = np.hstack([obs_upper_bound, np.array([[act_hi] for i in range(self.NUM_DRONES)])])
-            return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
-            ############################################################
+
+            kin = spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
+
+            if self.OBS_TYPE == ObservationType.KIN: return kin
+
+        if self.OBS_TYPE == ObservationType.ALL:
+            return spaces.Dict({"kin": kin, "rgb": rgb, "dep": dep})
+
         else:
             print("[ERROR] in BaseRLAviary._observationSpace()")
     
@@ -290,7 +306,7 @@ class BaseRLAviary(BaseAviary):
             A Box() of shape (NUM_DRONES,H,W,4) or (NUM_DRONES,12) depending on the observation type.
 
         """
-        if self.OBS_TYPE == ObservationType.RGB:
+        if self.OBS_TYPE in (ObservationType.RGB, ObservationType.DEP, ObservationType.ALL):
             if self.step_counter%self.IMG_CAPTURE_FREQ == 0:
                 for i in range(self.NUM_DRONES):
                     self.rgb[i], self.dep[i], self.seg[i] = self._getDroneImages(i,
@@ -303,8 +319,15 @@ class BaseRLAviary(BaseAviary):
                                           path=self.ONBOARD_IMG_PATH+"drone_"+str(i),
                                           frame_num=int(self.step_counter/self.IMG_CAPTURE_FREQ)
                                           )
-            return np.array([self.rgb[i] for i in range(self.NUM_DRONES)]).astype('float32')
-        elif self.OBS_TYPE == ObservationType.KIN:
+            if self.OBS_TYPE in (ObservationType.RGB, ObservationType.ALL):
+                rgb = np.array([self.rgb[i] for i in range(self.NUM_DRONES)]).astype('uint8')
+                if self.OBS_TYPE == ObservationType.RGB: return rgb
+
+            if self.OBS_TYPE in (ObservationType.DEP, ObservationType.ALL):
+                dep = np.array([self.dep[i] for i in range(self.NUM_DRONES)]).astype('float32')
+                if self.OBS_TYPE == ObservationType.DEP: return dep
+
+        if self.OBS_TYPE in (ObservationType.KIN, ObservationType.ALL):
             ############################################################
             #### OBS SPACE OF SIZE 12
             obs_12 = np.zeros((self.NUM_DRONES,12))
@@ -312,11 +335,15 @@ class BaseRLAviary(BaseAviary):
                 #obs = self._clipAndNormalizeState(self._getDroneStateVector(i))
                 obs = self._getDroneStateVector(i)
                 obs_12[i, :] = np.hstack([obs[0:3], obs[7:10], obs[10:13], obs[13:16]]).reshape(12,)
-            ret = np.array([obs_12[i, :] for i in range(self.NUM_DRONES)]).astype('float32')
+            kin = np.array([obs_12[i, :] for i in range(self.NUM_DRONES)]).astype('float32')
             #### Add action buffer to observation #######################
             for i in range(self.ACTION_BUFFER_SIZE):
-                ret = np.hstack([ret, np.array([self.action_buffer[i][j, :] for j in range(self.NUM_DRONES)])])
-            return ret
-            ############################################################
+                kin = np.hstack([kin, np.array([self.action_buffer[i][j, :] for j in range(self.NUM_DRONES)])])
+
+            if self.OBS_TYPE == ObservationType.KIN: return kin
+
+        if self.OBS_TYPE == ObservationType.ALL:
+            return {"kin": kin, "rgb": rgb, "dep": dep}
+
         else:
             print("[ERROR] in BaseRLAviary._computeObs()")

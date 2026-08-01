@@ -2,7 +2,7 @@
 
 Setup
 -----
-Step 1: Clone pycffirmware from https://github.com/utiasDSL/pycffirmware
+Step 1: Clone pycffirmware from https://github.com/learnsyslab/pycffirmware
 Step 2: Follow the install instructions for pycffirmware in its README 
 
 Example
@@ -95,7 +95,7 @@ def run(
                 yaw = i*np.pi/delta/2
                 rpy_rate = np.zeros(3)
                 env.sendFullStateCmd(pos, vel, acc, yaw, rpy_rate, t)
-            except:
+            except Exception:
                 break
 
         #### Log the simulation ####################################
