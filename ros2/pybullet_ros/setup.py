@@ -21,7 +21,6 @@ setup(
     maintainer_email='yamazumi.mitsuhiro@gmail.com',
     description='setup PID Drone control in ROS2',
     license='MIT',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'test_pid = pybullet_ros.example_pid:main',

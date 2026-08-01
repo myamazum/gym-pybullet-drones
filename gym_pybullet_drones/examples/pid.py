@@ -192,7 +192,7 @@ if __name__ == "__main__":
     parser.add_argument('--control_freq_hz',    default=DEFAULT_CONTROL_FREQ_HZ,         type=int,           help='Control frequency in Hz (default: 48)', metavar='')
     parser.add_argument('--duration_sec',       default=DEFAULT_DURATION_SEC,         type=int,           help='Duration of the simulation in seconds (default: 5)', metavar='')
     parser.add_argument('--output_folder',     default=DEFAULT_OUTPUT_FOLDER, type=str,           help='Folder where to save logs (default: "results")', metavar='')
-    parser.add_argument('--colab',              default=DEFAULT_COLAB, type=bool,           help='Whether example is being run by a notebook (default: "False")', metavar='')
+    parser.add_argument('--colab',              default=DEFAULT_COLAB, type=str2bool,       help='Whether example is being run by a notebook (default: "False")', metavar='')
     ARGS = parser.parse_args()
 
     run(**vars(ARGS))

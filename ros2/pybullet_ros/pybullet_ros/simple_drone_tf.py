@@ -7,43 +7,35 @@ Example
 -------
 In a terminal, run as:
 
-    $ ros2 run pybullet_ros drone.py
+    $ ros2 run pybullet_ros drone_tf
 
 Notes
 -----
-The drones move, at different altitudes, along cicular trajectories 
+The drones move, at different altitudes, along circular trajectories
 in the X-Y plane, around point (0, -.3).
 
 """
-import math
+import signal
+
 import numpy as np
-import time
-import pybullet as p
-
 import rclpy
-from rclpy.executors import SingleThreadedExecutor
-from rclpy.executors import MultiThreadedExecutor
-from rclpy.executors import ExternalShutdownException
+from geometry_msgs.msg import TransformStamped
+from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from rclpy.node import Node
+from tf2_ros import TransformBroadcaster
+from tf_transformations import quaternion_from_euler
 
-import rclpy.time
-from tf2_ros import TransformBroadcaster, TransformListener, TransformException, Buffer
-from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
-from tf_transformations import quaternion_from_euler, euler_from_quaternion
-from geometry_msgs.msg import Transform, TransformStamped, PoseStamped
-
-from gym_pybullet_drones.utils.enums import DroneModel, Physics
-from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
-from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
-from gym_pybullet_drones.utils.utils import sync
+from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
+from gym_pybullet_drones.utils.enums import DroneModel, Physics
+from gym_pybullet_drones.utils.Logger import Logger
 
 DEFAULT_DRONES = DroneModel("cf2x")
 DEFAULT_NUM_DRONES = 4
 DEFAULT_PHYSICS = Physics("pyb")
-DEFAULT_GUI = True
+DEFAULT_GUI = False
 DEFAULT_RECORD_VISION = False
-DEFAULT_PLOT = True
+DEFAULT_PLOT = False
 DEFAULT_USER_DEBUG_GUI = False
 DEFAULT_OBSTACLES = True
 DEFAULT_SIMULATION_FREQ_HZ = 240
@@ -60,9 +52,6 @@ class SimpleDrone(Node):
 
         # Initialize the transform broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
-        self.tf_broadcaster_static = StaticTransformBroadcaster(self)
-        self.tfBuffer = Buffer()
-        self.tf_listerner = TransformListener(self.tfBuffer, self)
 
         timer_period = 1/DEFAULT_GUIDANCE_FREQ_HZ #[s]
         self.timer = self.create_timer(timer_period,self._timer_callback)
@@ -79,30 +68,30 @@ class SimpleDrone(Node):
 
         # tf
         self._suffix = _node
-        self.base_tf = TransformStamped()
         self.baselink_tf = TransformStamped()
-        self.odom_tf = TransformStamped()
+
+        self.baselink_tf.header.frame_id = "world"
+        self.baselink_tf.child_frame_id = "baselink_" + self._suffix
 
         self.PYB_CLIENT = None
-        self.INIT_XYZS = None
-        self.INIT_RPYS = None
+        self.INIT_XYZS = np.zeros(3)
+        self.INIT_RPYS = np.zeros(3)
         self.CURR_XYZS = None
         self.CURR_RPYS = None
         self.TARGET_POS = None
         self.NUM_WP = 0
         self.NUM_WP_ALL = 0
-        pass
     
-    def setEnv(self,i_num,R,H,H_STEP,_launch=False):
+    def setEnv(self, i_num, R, H, H_STEP):
         #### Initialize the simulation #############################
-        if _launch:
-            self.getBase()
-        else:
-            self.INIT_XYZS = np.array([R*np.cos((i_num/6.)*2*np.pi +np.pi/2), 
-                                    R*np.sin((i_num/6.)*2*np.pi +np.pi/2)-R, 
-                                    H+i_num*H_STEP])
-            self.INIT_RPYS = np.array([0, 0, i_num*(np.pi/2)/DEFAULT_NUM_DRONES])
-            self.setBase()
+        self.INIT_XYZS = np.array([R*np.cos((i_num/6.)*2*np.pi +np.pi/2),
+                                   R*np.sin((i_num/6.)*2*np.pi +np.pi/2)-R,
+                                   H+i_num*H_STEP])
+        self.INIT_RPYS = np.array([0, 0, i_num*(np.pi/2)/DEFAULT_NUM_DRONES])
+        self.publish_transform(
+            self.INIT_XYZS,
+            quaternion_from_euler(*self.INIT_RPYS),
+        )
 
         #### Initialize a circular trajectory ######################
         PERIOD = 12
@@ -129,96 +118,26 @@ class SimpleDrone(Node):
         self.TARGET_POS = np.zeros((self.NUM_WP,3))
         self.TARGET_POS = TRAJECTORY_ALL[self.step_counter:(self.NUM_WP+self.step_counter),:]
 
-    def setBase(self):
-        ## set base_tf
-        self.base_tf.header.stamp = self.get_clock().now().to_msg()
-        self.base_tf.header.frame_id = "world"
-        self.base_tf.child_frame_id = "base_"+self._suffix
-        self.base_tf.transform.translation.x = self.INIT_XYZS[0]
-        self.base_tf.transform.translation.y = self.INIT_XYZS[1]
-        self.base_tf.transform.translation.z = self.INIT_XYZS[2]
-        q = quaternion_from_euler(self.INIT_RPYS[0], self.INIT_RPYS[1], self.INIT_RPYS[2])
-        self.base_tf.transform.rotation.x = q[0]
-        self.base_tf.transform.rotation.y = q[1]
-        self.base_tf.transform.rotation.z = q[2]
-        self.base_tf.transform.rotation.w = q[3]
+    def publish_transform(self, position=None, quaternion=None):
+        """Publish the simulator-owned ``world -> baselink`` transform."""
 
-        self.baselink_tf.header.stamp = self.base_tf.header.stamp
-        self.baselink_tf.header.frame_id = "base_"+self._suffix
-        self.baselink_tf.child_frame_id = "baselink_"+self._suffix
-
-        self.tf_broadcaster_static.sendTransform(self.base_tf)
+        if position is None:
+            position = self.obs[0:3]
+        if quaternion is None:
+            quaternion = self.obs[3:7]
+        self.baselink_tf.header.stamp = self.get_clock().now().to_msg()
+        self.baselink_tf.transform.translation.x = float(position[0])
+        self.baselink_tf.transform.translation.y = float(position[1])
+        self.baselink_tf.transform.translation.z = float(position[2])
+        self.baselink_tf.transform.rotation.x = float(quaternion[0])
+        self.baselink_tf.transform.rotation.y = float(quaternion[1])
+        self.baselink_tf.transform.rotation.z = float(quaternion[2])
+        self.baselink_tf.transform.rotation.w = float(quaternion[3])
         self.tf_broadcaster.sendTransform(self.baselink_tf)
-
-    def getBase(self):
-        when = self.get_clock().now() - rclpy.time.Duration(seconds=5.0)
-        try:
-            to_frame_rel = "world"
-            from_frame_rel = "base_"+self._suffix
-            _base_tf = self.tfBuffer.lookup_transform(
-                to_frame_rel,
-                from_frame_rel,
-                rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=10.0)
-            )
-            self.base_tf = _base_tf
-            self.INIT_XYZS[0] = _base_tf.transform.translation.x
-            self.INIT_XYZS[1] = _base_tf.transform.translation.y
-            self.INIT_XYZS[2] = _base_tf.transform.translation.z
-            _rpy = euler_from_quaternion(
-                _base_tf.transform.rotation.x,
-                _base_tf.transform.rotation.y,
-                _base_tf.transform.rotation.z,
-                _base_tf.transform.rotation.w,)
-            self.INIT_RPYS[0] = _rpy[0]
-            self.INIT_RPYS[1] = _rpy[1]
-            self.INIT_RPYS[2] = _rpy[2]
-        except TransformException as ex:
-            self.get_logger().info(
-                f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
-
-    def setOdom(self):
-        self.odom_tf.header.stamp = self.get_clock().now().to_msg()
-        self.odom_tf.header.frame_id = 'world'
-        self.odom_tf.child_frame_id = 'odom_'+self._suffix
-        self.odom_tf.transform.translation.x = self.obs[0]
-        self.odom_tf.transform.translation.y = self.obs[1]
-        self.odom_tf.transform.translation.z = self.obs[2]
-        self.odom_tf.transform.rotation.x = self.obs[3]
-        self.odom_tf.transform.rotation.y = self.obs[4]
-        self.odom_tf.transform.rotation.z = self.obs[5]
-        self.odom_tf.transform.rotation.w = self.obs[6]
-        self.tf_broadcaster.sendTransform(self.odom_tf)
-
-    def setLink(self):
-        _tf = TransformStamped()
-        _tf.header.stamp = self.get_clock().now().to_msg()
-        _tf.header.frame_id = "world"
-        _tf.child_frame_id = 'baselink_'+self._suffix
-        _tf.transform=self.odom_tf.transform
-        self.tf_broadcaster.sendTransform(_tf)
-
-    def getLink(self):
-        try:
-            to_frame_rel = "odom_"+self._suffix
-            from_frame_rel = "base_"+self._suffix
-            _link_tf = self.tfBuffer.lookup_transform(
-                to_frame_rel,
-                from_frame_rel,
-                rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=1.0)
-            )
-            self.baselink_tf.header = self.get_clock().now().to_msg()
-            self.baselink_tf.transform=_link_tf.transform
-            self.tf_broadcaster.sendTransform(self.baselink_tf)
-        except TransformException as ex:
-            self.get_logger().info(
-                f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
 
 
     def _timer_callback(self):
-        if self.power_on==False:
-            print("None")
+        if not self.power_on:
             return
         #### Step the controller ###################################
         self.step_counter += self.wp_counters
@@ -235,6 +154,8 @@ class SimpleDrone(Node):
 class SimpleWorld(Node):
     def __init__(self):
         super().__init__('simple_copter_sim')
+        self.declare_parameter('gui', DEFAULT_GUI)
+        self.declare_parameter('plot', DEFAULT_PLOT)
         
         timer_period = 1/DEFAULT_CONTROL_FREQ_HZ #[s]
         self.timer = self.create_timer(timer_period,self._timer_callback)
@@ -245,6 +166,7 @@ class SimpleWorld(Node):
         self.ctrl = None
         self.step_counters = None
         self.logger = None
+        self.plot_enabled = DEFAULT_PLOT
         self.num_drones = 0
         self.sim_step = 0
         self.time = 0
@@ -266,9 +188,9 @@ class SimpleWorld(Node):
     def setEnv(self,
             drone=DEFAULT_DRONES,
             physics=DEFAULT_PHYSICS,
-            gui=DEFAULT_GUI,
+            gui=None,
             record_video=DEFAULT_RECORD_VISION,
-            plot=DEFAULT_PLOT,
+            plot=None,
             user_debug_gui=DEFAULT_USER_DEBUG_GUI,
             obstacles=DEFAULT_OBSTACLES,
             simulation_freq_hz=DEFAULT_SIMULATION_FREQ_HZ,
@@ -276,6 +198,13 @@ class SimpleWorld(Node):
             duration_sec=DEFAULT_DURATION_SEC,
             output_folder=DEFAULT_OUTPUT_FOLDER,
             colab=DEFAULT_COLAB):
+
+        #### Resolve launch/runtime parameters #####################
+        if gui is None:
+            gui = self.get_parameter('gui').get_parameter_value().bool_value
+        if plot is None:
+            plot = self.get_parameter('plot').get_parameter_value().bool_value
+        self.plot_enabled = plot
 
         #### Initialize the simulation #############################
         if self.num_drones == 0:
@@ -298,7 +227,7 @@ class SimpleWorld(Node):
                     neighbourhood_radius=10,
                     pyb_freq=simulation_freq_hz,
                     ctrl_freq=control_freq_hz,
-                    gui=False,
+                    gui=gui,
                     record=record_video,
                     obstacles=obstacles,
                     user_debug_gui=user_debug_gui
@@ -322,7 +251,7 @@ class SimpleWorld(Node):
 
     def _timer_callback(self):
         #### Update Obs ###################################
-        obs, reward, terminated, truncated, info = self.env.step(self.action)
+        obs, *_ = self.env.step(self.action)
         for j in range(self.num_drones):
             self.droneList[j].obs = obs[j,:]
 
@@ -349,51 +278,52 @@ class SimpleWorld(Node):
                         state=obs[j],
                         control=np.hstack([self.droneList[j].TARGET_POS[self.droneList[j].wp_counters, :2], self.INIT_XYZS[j, 2], self.INIT_RPYS[j, :], np.zeros(6)])
                         )
-            self.droneList[j].setOdom()
-            if self.time % int(self.env.CTRL_FREQ/2) == 0:
-                self.droneList[j].setLink()
+            self.droneList[j].publish_transform()
 
         #### Sync the simulation ###################################
         self.time += 1
-        pass
 
     def plot(self):
         self.logger.plot()
 
-def main():
-    name_list = ['a','b','c','d']
-    _launch = False
-    try:
-        rclpy.init()
-        exec = SingleThreadedExecutor()
+    def close(self):
+        if self.env is not None:
+            self.env.close()
 
-        world_node = SimpleWorld()
-        exec.add_node(world_node)
-        time.sleep(1)
+
+def main(args=None):
+    rclpy.init(args=args)
+    executor = SingleThreadedExecutor()
+    world_node = SimpleWorld()
+    name_list = ['a','b','c','d']
+    try:
+        executor.add_node(world_node)
 
         for i in range(DEFAULT_NUM_DRONES):
             if i < len(name_list):
                 _name = name_list[i]
-                _launch = False
-                '''with tf error: _launch = True'''
             else:
                 _name = 'drone_'+str(i)
-                _launch = False
             _d = SimpleDrone(_name)
             world_node.setDroneInWorld( _d )
-            world_node.droneList[i].setEnv(i,.3,.1,.05,_launch)
-            exec.add_node(world_node.droneList[i])
+            world_node.droneList[i].setEnv(i,.3,.1,.05)
+            executor.add_node(world_node.droneList[i])
         world_node.setEnv()
-        exec.spin()
-    except(KeyboardInterrupt,ExternalShutdownException):
+        executor.spin()
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
-
-    exec.shutdown()
-    world_node.plot()
-    for i in range(DEFAULT_NUM_DRONES):
-        world_node.droneList[i].destroy_node()
-    world_node.destroy_node()
-    rclpy.shutdown()
+    finally:
+        # ros2 launch may forward another SIGINT while cleanup is in progress.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        executor.shutdown()
+        world_node.close()
+        if world_node.logger is not None and world_node.plot_enabled:
+            world_node.plot()
+        for drone in world_node.droneList:
+            drone.destroy_node()
+        world_node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

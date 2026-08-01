@@ -7,7 +7,7 @@ from stable_baselines3 import PPO
 from gym_pybullet_drones.envs.HoverAviary import HoverAviary
 from gym_pybullet_drones.envs.MultiHoverAviary import MultiHoverAviary
 from gym_pybullet_drones.utils.enums import ObservationType, ActionType
-from gym_pybullet_drones.utils.utils import sync
+from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.Logger import Logger
 
 DEFAULT_MODEL_PATH = "results/best_model.zip"
@@ -78,8 +78,8 @@ def play(model_path=DEFAULT_MODEL_PATH, multiagent=DEFAULT_MA, gui=DEFAULT_GUI):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a trained PPO policy in PyBullet drones environment.")
     parser.add_argument('--model_path', type=str, default=DEFAULT_MODEL_PATH, help='Path to saved policy zip file')
-    parser.add_argument('--multiagent', type=bool, default=DEFAULT_MA, help='Whether to use MultiHoverAviary')
-    parser.add_argument('--gui', type=bool, default=DEFAULT_GUI, help='Enable GUI rendering')
+    parser.add_argument('--multiagent', type=str2bool, default=DEFAULT_MA, help='Whether to use MultiHoverAviary')
+    parser.add_argument('--gui', type=str2bool, default=DEFAULT_GUI, help='Enable GUI rendering')
     args = parser.parse_args()
 
     play(**vars(args))

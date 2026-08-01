@@ -81,8 +81,8 @@ class CtrlAviary(BaseAviary):
 
         """
         #### Action vector ######## P0            P1            P2            P3
-        act_lower_bound = np.array([[0.,           0.,           0.,           0.] for i in range(self.NUM_DRONES)])
-        act_upper_bound = np.array([[self.MAX_RPM, self.MAX_RPM, self.MAX_RPM, self.MAX_RPM] for i in range(self.NUM_DRONES)])
+        act_lower_bound = np.zeros((self.NUM_DRONES, 4), dtype=np.float32)
+        act_upper_bound = np.full((self.NUM_DRONES, 4), self.MAX_RPM, dtype=np.float32)
         return spaces.Box(low=act_lower_bound, high=act_upper_bound, dtype=np.float32)
     
     ################################################################################
@@ -97,8 +97,8 @@ class CtrlAviary(BaseAviary):
 
         """
         #### Observation vector ### X        Y        Z       Q1   Q2   Q3   Q4   R       P       Y       VX       VY       VZ       WX       WY       WZ       P0            P1            P2            P3
-        obs_lower_bound = np.array([[-np.inf, -np.inf, 0.,     -1., -1., -1., -1., -np.pi, -np.pi, -np.pi, -np.inf, -np.inf, -np.inf, -np.inf, -np.inf, -np.inf, 0.,           0.,           0.,           0.] for i in range(self.NUM_DRONES)])
-        obs_upper_bound = np.array([[np.inf,  np.inf,  np.inf, 1.,  1.,  1.,  1.,  np.pi,  np.pi,  np.pi,  np.inf,  np.inf,  np.inf,  np.inf,  np.inf,  np.inf,  self.MAX_RPM, self.MAX_RPM, self.MAX_RPM, self.MAX_RPM] for i in range(self.NUM_DRONES)])
+        obs_lower_bound = np.array([[-np.inf, -np.inf, 0.,     -1., -1., -1., -1., -np.pi, -np.pi, -np.pi, -np.inf, -np.inf, -np.inf, -np.inf, -np.inf, -np.inf, 0.,           0.,           0.,           0.] for i in range(self.NUM_DRONES)], dtype=np.float32)
+        obs_upper_bound = np.array([[np.inf,  np.inf,  np.inf, 1.,  1.,  1.,  1.,  np.pi,  np.pi,  np.pi,  np.inf,  np.inf,  np.inf,  np.inf,  np.inf,  np.inf,  self.MAX_RPM, self.MAX_RPM, self.MAX_RPM, self.MAX_RPM] for i in range(self.NUM_DRONES)], dtype=np.float32)
         return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
 
     ################################################################################
@@ -114,7 +114,10 @@ class CtrlAviary(BaseAviary):
             An ndarray of shape (NUM_DRONES, 20) with the state of each drone.
 
         """
-        return np.array([self._getDroneStateVector(i) for i in range(self.NUM_DRONES)])
+        return np.asarray(
+            [self._getDroneStateVector(i) for i in range(self.NUM_DRONES)],
+            dtype=np.float32,
+        )
 
     ################################################################################
 

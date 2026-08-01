@@ -30,11 +30,11 @@ ENV PATH="/opt/miniconda3/bin:${PATH}"
 SHELL ["/bin/bash", "-lc"]
 
 RUN python -m pip install --upgrade pip && \
-    conda update -n base -c defaults -y conda && \
-    conda create -n ros_env -y python=3.10 && \
-    conda install -n ros_env -y \
+    conda create -n ros_env -y --override-channels -c conda-forge python=3.10 && \
+    conda install -n ros_env -y --override-channels \
         -c robostack-staging -c conda-forge \
         ros-humble-desktop \
+        ros-humble-tf-transformations \
         compilers cmake pkg-config make ninja \
         colcon-common-extensions catkin_tools rosdep
 
@@ -47,6 +47,12 @@ COPY pyproject.toml README.md ./
 COPY gym_pybullet_drones/ ./gym_pybullet_drones/
 RUN conda run -n ros_env python -m pip install --upgrade pip && \
     conda run -n ros_env python -m pip install -e .
+
+RUN conda install -n ros_env -y --override-channels \
+        -c robostack-staging -c conda-forge ros-humble-xacro && \
+    conda run -n ros_env python -m pip install \
+        'setuptools>=77,<80' 'pytest>=7,<8' colcon-notification && \
+    conda run -n ros_env python -m pip check
 
 RUN echo 'source /opt/miniconda3/etc/profile.d/conda.sh && conda activate ros_env' >> /root/.bashrc
 

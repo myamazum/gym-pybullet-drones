@@ -1,20 +1,12 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
-  <xacro:macro name="drone_macro" params="suffix parent x_dist y_dist z_dist radius">
-    <link name="base_${suffix}"/>
+  <xacro:macro name="drone_macro" params="suffix parent">
     <link name="baselink_${suffix}"/>
     <link name="sensor_${suffix}"/>
-    <link name="odom_${suffix}"/>
-
-    <joint name="base_${suffix}_joint" type="fixed">
-      <origin rpy="0 0 ${radians(radius)}" xyz="${x_dist} ${y_dist} ${z_dist}"/>
-      <parent link="${parent}"/>
-      <child  link="base_${suffix}"/>    
-    </joint>
 
     <joint name="baselink_${suffix}_joint" type="floating">
       <origin rpy="0 0 0" xyz="0 0 0"/>
-      <parent link="base_${suffix}"/>
+      <parent link="${parent}"/>
       <child  link="baselink_${suffix}"/>    
     </joint>
 
@@ -24,11 +16,5 @@
       <child  link="sensor_${suffix}"/>
     </joint>
 
-    <joint name="odom_${suffix}_joint" type="floating">
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <parent link="baselink_${suffix}"/>
-      <child  link="odom_${suffix}"/>
-    </joint>
-    
   </xacro:macro>
 </robot>

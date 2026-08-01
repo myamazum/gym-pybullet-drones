@@ -1,7 +1,5 @@
-import os
 import numpy as np
 import xml.etree.ElementTree as etxml
-import pkg_resources
 import socket 
 import struct
 
@@ -9,6 +7,7 @@ from transforms3d.quaternions import rotate_vector, qconjugate, mat2quat, qmult
 from transforms3d.utils import normalized_vector
 
 from gym_pybullet_drones.utils.enums import DroneModel
+from gym_pybullet_drones.utils.resources import asset_path
 
 class CTBRControl(object):
     """Base class for control.
@@ -233,7 +232,7 @@ class CTBRControl(object):
         """
         #### Get the XML tree of the drone model to control ########
         URDF = self.DRONE_MODEL.value + ".urdf"
-        path = pkg_resources.resource_filename('gym_pybullet_drones', 'assets/'+URDF)
+        path = asset_path(URDF)
         URDF_TREE = etxml.parse(path).getroot()
         #### Find and return the desired parameter #################
         if parameter_name == 'm':

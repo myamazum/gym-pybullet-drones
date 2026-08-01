@@ -41,11 +41,11 @@ def run(
         colab=DEFAULT_COLAB
         ):
 
-    INIT_XYZS = np.array([[0, 0, 0]])
-    INIT_RPYS = np.array([[0, 0, 0]])
+    INIT_XYZS = np.zeros((num_drones, 3))
+    INIT_RPYS = np.zeros((num_drones, 3))
 
-    TARGET_POS = np.array([[0, 0, 1]])
-    TARGET_RPY = np.array([[0, 0, 0]])
+    TARGET_POS = np.tile(np.array([0, 0, 1]), (num_drones, 1))
+    TARGET_RPY = np.zeros((num_drones, 3))
 
     env = CtrlAviary(drone_model=drone,
                         num_drones=num_drones,

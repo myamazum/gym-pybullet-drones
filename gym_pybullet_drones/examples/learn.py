@@ -27,6 +27,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.monitor import Monitor
 
 from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.envs.HoverAviary import HoverAviary
@@ -56,14 +57,14 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
                                  n_envs=1,
                                  seed=0
                                  )
-        eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+        eval_env = Monitor(HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT))
     else:
         train_env = make_vec_env(MultiHoverAviary,
                                  env_kwargs=dict(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT),
                                  n_envs=1,
                                  seed=0
                                  )
-        eval_env = MultiHoverAviary(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT)
+        eval_env = Monitor(MultiHoverAviary(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT))
 
     #### Check the environment's spaces ########################
     print('[INFO] Action space:', train_env.action_space)
@@ -73,7 +74,8 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
     model = PPO('MlpPolicy',
                 train_env,
                 # tensorboard_log=filename+'/tb/',
-                verbose=1)
+                verbose=1,
+                device='cpu')
 
     #### Target cumulative rewards (problem-dependent) ##########
     if DEFAULT_ACT == ActionType.ONE_D_RPM:
@@ -123,8 +125,9 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
     if os.path.isfile(filename+'/best_model.zip'):
         path = filename+'/best_model.zip'
     else:
-        print("[ERROR]: no model under the specified path", filename)
-    model = PPO.load(path)
+        path = filename+'/final_model.zip'
+        print("[WARNING]: no best model found; loading the final model", path)
+    model = PPO.load(path, device='cpu')
 
     #### Show (and record a video of) the model's performance ##
     if not multiagent:
@@ -132,14 +135,14 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
                                obs=DEFAULT_OBS,
                                act=DEFAULT_ACT,
                                record=record_video)
-        test_env_nogui = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+        test_env_nogui = Monitor(HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT))
     else:
         test_env = MultiHoverAviary(gui=gui,
                                         num_drones=DEFAULT_AGENTS,
                                         obs=DEFAULT_OBS,
                                         act=DEFAULT_ACT,
                                         record=record_video)
-        test_env_nogui = MultiHoverAviary(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT)
+        test_env_nogui = Monitor(MultiHoverAviary(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT))
     logger = Logger(logging_freq_hz=int(test_env.CTRL_FREQ),
                 num_drones=DEFAULT_AGENTS if multiagent else 1,
                 output_folder=output_folder,
@@ -187,9 +190,12 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
         test_env.render()
         print(terminated)
         sync(i, start, test_env.CTRL_TIMESTEP)
-        if terminated:
-            obs = test_env.reset(seed=42, options={})
+        if terminated or truncated:
+            obs, _ = test_env.reset(seed=42, options={})
     test_env.close()
+    test_env_nogui.close()
+    eval_env.close()
+    train_env.close()
 
     if plot and DEFAULT_OBS == ObservationType.KIN:
         logger.plot()
@@ -201,7 +207,7 @@ if __name__ == '__main__':
     parser.add_argument('--gui',                default=DEFAULT_GUI,           type=str2bool,      help='Whether to use PyBullet GUI (default: True)', metavar='')
     parser.add_argument('--record_video',       default=DEFAULT_RECORD_VIDEO,  type=str2bool,      help='Whether to record a video (default: False)', metavar='')
     parser.add_argument('--output_folder',      default=DEFAULT_OUTPUT_FOLDER, type=str,           help='Folder where to save logs (default: "results")', metavar='')
-    parser.add_argument('--colab',              default=DEFAULT_COLAB,         type=bool,          help='Whether example is being run by a notebook (default: "False")', metavar='')
+    parser.add_argument('--colab',              default=DEFAULT_COLAB,         type=str2bool,      help='Whether example is being run by a notebook (default: "False")', metavar='')
     ARGS = parser.parse_args()
 
     run(**vars(ARGS))

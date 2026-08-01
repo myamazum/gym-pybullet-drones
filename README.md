@@ -2,7 +2,7 @@
 > This repository is a ROS 2-enabled downstream fork of `learnsyslab/gym-pybullet-drones`.
 > Phase 0 is synchronized with upstream `main` through commit
 > `e712698a05a80728b06572819dcf044596707754` (2026-07-11), while retaining
-> the ROS 2 packages, container environment, and downstream CF2X physics correction.
+> the ROS 2 packages and container environment.
 > See [`docs/phase0-upstream-sync.md`](docs/phase0-upstream-sync.md) for the merge record.
 
 > [!TIP]
@@ -49,7 +49,7 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-The synchronized package metadata currently follows upstream version `2.1.0`, including Gymnasium 1.2, Stable-Baselines3 2.8, NumPy 2.2, SciPy 1.15, and PyBullet 3.2.7-compatible constraints.
+The synchronized dependency metadata currently follows upstream version `2.1.0`, including Gymnasium 1.2, Stable-Baselines3 2.8, NumPy 2.2, SciPy 1.15, and PyBullet 3.2.7-compatible constraints. The package repository points to this fork, but this downstream tree is not intended to be published to PyPI under the upstream version.
 
 ## ROS 2 container installation
 
@@ -97,6 +97,13 @@ ros2 run pybullet_ros drone_tf
 # Launch robot_state_publisher / tf setup
 ros2 launch pybullet_ros tf_drone.launch.py
 ```
+
+The tf launch is headless by default. Add `gui:=true` (and optionally
+`plot:=true`) when a display is available.
+
+`swarm_tools` remains experimental. Its `ros2 run swarm_tools swarm_control`
+entry point aligns sensing timestamps and publishes a zero placeholder waypoint
+horizon; a mission-specific swarm control law still needs to be supplied.
 
 ## Python examples
 

@@ -5,7 +5,7 @@ description = "PyBullet Gym environments for single and multi-agent reinforcemen
 authors = ["Jacopo Panerati <jacopo.panerati@utoronto.ca>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/learnsyslab/gym-pybullet-drones"
+repository = "https://github.com/myamazum/gym-pybullet-drones"
 packages = [
     { include = "gym_pybullet_drones" }
 ]
@@ -20,9 +20,12 @@ pybullet = "^3.2.7"
 gymnasium = "^1.2"
 stable-baselines3 = "^2.8"
 control = "^0.10.2"
+
+[tool.poetry.group.dev.dependencies]
 pytest = "^9.0"
 
-[tool.poetry.dev-dependencies]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [build-system]
 requires = ["poetry-core"]

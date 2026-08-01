@@ -4,7 +4,6 @@ import time
 import collections
 from datetime import datetime
 import xml.etree.ElementTree as etxml
-import pkg_resources
 from PIL import Image
 # import pkgutil
 # egl = pkgutil.get_loader('eglRenderer')
@@ -13,6 +12,7 @@ import pybullet as p
 import pybullet_data
 import gymnasium as gym
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ImageType
+from gym_pybullet_drones.utils.resources import asset_path
 
 
 class BaseAviary(gym.Env):
@@ -111,7 +111,7 @@ class BaseAviary(gym.Env):
         self.DW_COEFF_1, \
         self.DW_COEFF_2, \
         self.DW_COEFF_3 = self._parseURDFParameters()
-        print("[INFO] BaseAviary.__init__() loaded parameters from the drone's .urdf:\n[INFO] m {:f}, L {:f},\n[INFO] ixx {:f}, iyy {:f}, izz {:f},\n[INFO] kf {:f}, km {:f},\n[INFO] t2w {:f}, max_speed_kmh {:f},\n[INFO] gnd_eff_coeff {:f}, prop_radius {:f},\n[INFO] drag_xy_coeff {:f}, drag_z_coeff {:f},\n[INFO] dw_coeff_1 {:f}, dw_coeff_2 {:f}, dw_coeff_3 {:f}".format(
+        print("[INFO] BaseAviary.__init__() loaded parameters from the drone's .urdf:\n[INFO] m {:f}, L {:f},\n[INFO] ixx {:f}, iyy {:f}, izz {:f},\n[INFO] kf {:e}, km {:e},\n[INFO] t2w {:f}, max_speed_kmh {:f},\n[INFO] gnd_eff_coeff {:f}, prop_radius {:f},\n[INFO] drag_xy_coeff {:f}, drag_z_coeff {:f},\n[INFO] dw_coeff_1 {:f}, dw_coeff_2 {:f}, dw_coeff_3 {:f}".format(
             self.M, self.L, self.J[0,0], self.J[1,1], self.J[2,2], self.KF, self.KM, self.THRUST2WEIGHT_RATIO, self.MAX_SPEED_KMH, self.GND_EFF_COEFF, self.PROP_RADIUS, self.DRAG_COEFF[0], self.DRAG_COEFF[2], self.DW_COEFF_1, self.DW_COEFF_2, self.DW_COEFF_3))
         #### Compute constants #####################################
         self.GRAVITY = self.G*self.M
@@ -134,13 +134,11 @@ class BaseAviary(gym.Env):
         if self.VISION_ATTR:
             self.IMG_RES = np.array([64, 48])
             self.IMG_FRAME_PER_SEC = 24
-            self.IMG_CAPTURE_FREQ = int(self.PYB_FREQ/self.IMG_FRAME_PER_SEC)
+            capture_every_n_steps = max(1, round(self.CTRL_FREQ/self.IMG_FRAME_PER_SEC))
+            self.IMG_CAPTURE_FREQ = capture_every_n_steps * self.PYB_STEPS_PER_CTRL
             self.rgb = np.zeros(((self.NUM_DRONES, self.IMG_RES[1], self.IMG_RES[0], 4)))
             self.dep = np.ones(((self.NUM_DRONES, self.IMG_RES[1], self.IMG_RES[0])))
             self.seg = np.zeros(((self.NUM_DRONES, self.IMG_RES[1], self.IMG_RES[0])))
-            if self.IMG_CAPTURE_FREQ%self.PYB_STEPS_PER_CTRL != 0:
-                print("[ERROR] in BaseAviary.__init__(), PyBullet and control frequencies incompatible with the desired video capture frame rate ({:f}Hz)".format(self.IMG_FRAME_PER_SEC))
-                exit()
             if self.RECORD:
                 for i in range(self.NUM_DRONES):
                     os.makedirs(os.path.dirname(self.ONBOARD_IMG_PATH+"/drone_"+str(i)+"/"), exist_ok=True)
@@ -483,7 +481,7 @@ class BaseAviary(gym.Env):
         #### Load ground plane, drone and obstacles models #########
         self.PLANE_ID = p.loadURDF("plane.urdf", physicsClientId=self.CLIENT)
 
-        self.DRONE_IDS = np.array([p.loadURDF(pkg_resources.resource_filename('gym_pybullet_drones', 'assets/'+self.URDF),
+        self.DRONE_IDS = np.array([p.loadURDF(asset_path(self.URDF),
                                               self.INIT_XYZS[i,:],
                                               p.getQuaternionFromEuler(self.INIT_RPYS[i,:]),
                                               flags = p.URDF_USE_INERTIA_FROM_FILE,
@@ -847,7 +845,6 @@ class BaseAviary(gym.Env):
             x_torque = (forces[0] + forces[1] - forces[2] - forces[3]) * (self.L/np.sqrt(2))
             y_torque = (- forces[0] + forces[1] + forces[2] - forces[3]) * (self.L/np.sqrt(2))
         elif self.DRONE_MODEL==DroneModel.CF2X:
-            # Downstream correction retained from ros-pybullet-drone-dev.
             x_torque = - (forces[0] + forces[1] - forces[2] - forces[3]) * (self.L/np.sqrt(2))
             y_torque = (- forces[0] + forces[1] + forces[2] - forces[3]) * (self.L/np.sqrt(2))
         elif self.DRONE_MODEL==DroneModel.CF2P:
@@ -990,7 +987,7 @@ class BaseAviary(gym.Env):
         files in folder `assets/`.
 
         """
-        URDF_TREE = etxml.parse(pkg_resources.resource_filename('gym_pybullet_drones', 'assets/'+self.URDF)).getroot()
+        URDF_TREE = etxml.parse(asset_path(self.URDF)).getroot()
         M = float(URDF_TREE[1][0][1].attrib['value'])
         L = float(URDF_TREE[0].attrib['arm'])
         THRUST2WEIGHT_RATIO = float(URDF_TREE[0].attrib['thrust2weight'])

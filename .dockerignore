@@ -1,0 +1,9 @@
+**
+!Dockerfile
+!pyproject.toml
+!README.md
+!gym_pybullet_drones/
+!gym_pybullet_drones/**
+
+**/__pycache__/
+**/*.py[cod]
