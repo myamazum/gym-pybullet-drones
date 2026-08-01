@@ -439,3 +439,8 @@ TSWLatexianTemp*
 # option is specified. Footnotes are the stored in a file with suffix Notes.bib.
 # Uncomment the next line to have this generated file ignored.
 #*Notes.bib
+
+# ROS 2 / colcon generated artifacts
+ros2/build/
+ros2/install/
+ros2/log/

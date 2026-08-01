@@ -2,8 +2,11 @@ version: '3'
 
 services:
   ros:
-    image: pybullet:humble
+    image: ros-pybullet-drones:humble
     container_name: pydrone_test
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1

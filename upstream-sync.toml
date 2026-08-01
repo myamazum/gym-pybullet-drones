@@ -1,0 +1,12 @@
+[upstream]
+repository = "https://github.com/learnsyslab/gym-pybullet-drones"
+merge_base = "5404871f32697b7c568d9e2520368e81d46f0ab3"
+synced_commit = "e712698a05a80728b06572819dcf044596707754"
+synced_date = "2026-07-29"
+
+[downstream]
+repository = "https://github.com/myamazum/gym-pybullet-drones"
+original_archive = "gym-pybullet-drones-main(2).zip"
+development_archive = "ros-puybullet-drone-dev-develop.zip"
+ros_distribution = "humble"
+ubuntu_version = "22.04"
